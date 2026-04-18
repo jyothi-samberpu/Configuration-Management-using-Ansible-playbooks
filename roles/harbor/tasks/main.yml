@@ -1,0 +1,27 @@
+---
+# Main entry point for the harbor role.
+# Includes task files based on tags or conditions.
+
+- name: Run ping tasks
+  ansible.builtin.include_tasks: ping.yml
+  tags: linux_ping
+
+- name: Run download tasks
+  ansible.builtin.include_tasks: download.yml
+  tags: linux_download_harbor
+
+- name: Run install tasks
+  ansible.builtin.include_tasks: install.yml
+  tags: linux_install_harbor
+
+# - name: Run expose tasks
+#   ansible.builtin.include_tasks: expose.yml
+#   tags: linux_expose_harbor
+
+- name: Run stop tasks
+  ansible.builtin.include_tasks: stop.yml
+  tags: linux_stop_harbor
+
+- name: Run start tasks
+  ansible.builtin.include_tasks: start.yml
+  tags: linux_start_harbor

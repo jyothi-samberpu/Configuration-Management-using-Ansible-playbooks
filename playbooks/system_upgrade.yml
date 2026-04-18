@@ -1,0 +1,8 @@
+---
+- name: System Upgrade and Cleanup
+  hosts:
+    - jenkins
+    - docker  
+  become: true
+  roles:
+    - role: system_upgrade

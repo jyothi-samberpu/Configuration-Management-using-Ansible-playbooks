@@ -1,0 +1,125 @@
+---
+- name: Stop Ceph services on RMULENDA
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - ceph-crash.service
+    - ceph-mgr@RMULENDA.service
+    - ceph-mon@RMULENDA.service
+    - ceph-osd@0.service
+    - ceph-volume@lvm-0-27d5f11a-2342-4277-bedd-cafccb7f368f.service
+    - ceph-volume@lvm-0-3b98dfa1-8056-47cf-a857-d46e855330e3.service
+  when: inventory_hostname == 'RMULENDA'
+
+- name: Stop Ceph services on RMULENDA-SV1
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - ceph-crash.service
+  when: inventory_hostname == 'RMULENDA-SV1'
+
+- name: Stop Ceph services on RMULENDA-SV2
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - ceph-crash.service
+    - ceph-mon@RMULENDA-SV2.service
+    - ceph-osd@1.service
+    - ceph-volume@lvm-1-93d50388-3ce7-43c1-9011-366ab230d746.service
+  when: inventory_hostname == 'RMULENDA-SV2'
+
+- name: Stop Ceph services on RMULENDA-SV3
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - ceph-crash.service
+    - ceph-mon@RMULENDA-SV3.service
+    - ceph-osd@2.service
+    - ceph-volume@lvm-2-7c46b0f9-6088-4dad-ae3e-79df49785a10.service
+  when: inventory_hostname == 'RMULENDA-SV3'
+
+- name: Stop common Ceph services on all hosts
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - ceph.target
+
+- name: Ensure No Ceph Processes
+  become: yes
+  shell: pkill -f ceph || true
+  ignore_errors: yes  # This command will fail if no ceph processes are found, hence we ignore errors
+
+- name: Remove Ceph packages
+  become: yes
+  apt:
+    name: "{{ item }}"
+    state: absent
+    purge: yes
+  loop:
+    - ceph
+    - ceph-common
+    - ceph-mds
+    - ceph-mgr
+    - ceph-mon
+    - ceph-osd
+    - ceph-fs-common
+    - ceph-radosgw
+    - python3-ceph-argparse
+    - python3-rbd
+    - ceph-base
+
+- name: Remove Ceph configuration files
+  become: yes
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/ceph
+    - /var/lib/ceph
+
+- name: Clean up Ceph related directories
+  become: yes
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/log/ceph
+    - /var/run/ceph
+
+- name: Remove Ceph from Proxmox storage configuration
+  become: yes
+  command: pvesm remove {{ item.name }} {{ item.storage }}
+  loop:
+    - { name: 'rmulenda', storage: 'ceph' }
+    - { name: 'rmulenda_sv1', storage: 'ceph' }
+    - { name: 'rmulenda_sv2', storage: 'ceph' }
+    - { name: 'rmulenda_sv3', storage: 'ceph' }
+  ignore_errors: yes
+
+- name: Restart Proxmox services to ensure cleanup
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - pvedaemon
+    - pve-cluster
+
+- name: Reboot the system
+  become: yes
+  reboot:

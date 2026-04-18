@@ -1,0 +1,118 @@
+---
+# AWS CLI Role – Install AWS CLI without Docker repository interference
+
+- name: Backup existing APT sources list
+  command: cp /etc/apt/sources.list /etc/apt/sources.list.backup
+  become: yes
+  when: ansible_os_family == "Debian"
+  args:
+    creates: /etc/apt/sources.list.backup
+
+- name: Temporarily disable problematic repositories
+  shell: |
+    mv /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.list.bak || true
+    mv /etc/apt/sources.list.d/ngrok-agent.list /etc/apt/sources.list.d/ngrok-agent.list.bak || true
+  become: yes
+  when: ansible_os_family == "Debian"
+  register: disable_repos
+  changed_when: disable_repos.rc == 0
+
+- name: Force APT cache update with warnings ignored
+  command: apt-get update --allow-unauthenticated --allow-insecure-repositories
+  become: yes
+  when: ansible_os_family == "Debian"
+  register: apt_update_force
+  changed_when: apt_update_force.rc == 0
+  failed_when: apt_update_force.rc != 0 and "NO_PUBKEY" not in apt_update_force.stderr
+
+- name: Install prerequisites (Debian/Ubuntu)
+  apt:
+    name:
+      - unzip
+      - python3
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+  become: yes
+  register: apt_install
+  retries: 3
+  delay: 5
+  until: apt_install is success
+
+- name: Restore problematic repositories
+  shell: |
+    mv /etc/apt/sources.list.d/docker.list.bak /etc/apt/sources.list.d/docker.list || true
+    mv /etc/apt/sources.list.d/ngrok-agent.list.bak /etc/apt/sources.list.d/ngrok-agent.list || true
+  become: yes
+  when: ansible_os_family == "Debian" and disable_repos.changed
+
+- name: Install prerequisites (RedHat/CentOS)
+  yum:
+    name:
+      - unzip
+      - python3
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: yes
+
+- name: Check if AWS CLI is already installed
+  stat:
+    path: "{{ aws_install_path }}/v2/current/bin/aws"
+  register: aws_cli_installed
+
+- name: Create temporary directory for AWS CLI download
+  tempfile:
+    state: directory
+    suffix: awscli
+  register: temp_dir
+  when: not aws_cli_installed.stat.exists
+
+- name: Download AWS CLI v2
+  get_url:
+    url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-{{ aws_cli_version }}.zip"
+    dest: "{{ temp_dir.path }}/awscli.zip"
+    mode: '0644'
+  when: not aws_cli_installed.stat.exists
+
+- name: Unzip AWS CLI package
+  unarchive:
+    src: "{{ temp_dir.path }}/awscli.zip"
+    dest: "{{ temp_dir.path }}"
+    remote_src: yes
+  when: not aws_cli_installed.stat.exists
+
+- name: Install AWS CLI
+  command: "{{ temp_dir.path }}/aws/install -i {{ aws_install_path }} -b /usr/local/bin"
+  args:
+    creates: "{{ aws_install_path }}/v2/current/bin/aws"
+  become: yes
+  when: not aws_cli_installed.stat.exists
+
+- name: Clean up temporary directory
+  file:
+    path: "{{ temp_dir.path }}"
+    state: absent
+  when: not aws_cli_installed.stat.exists
+
+- name: Ensure AWS CLI config directory exists for root
+  file:
+    path: "/root/.aws"
+    state: directory
+    mode: '0700'
+  become: yes
+
+- name: Configure AWS CLI for root using a template
+  template:
+    src: aws_config.j2
+    dest: "/root/.aws/config"
+    mode: '0600'
+  become: yes
+
+- name: Verify AWS CLI installation
+  command: aws --version
+  register: aws_version_output
+  changed_when: false
+
+- name: Display AWS CLI version
+  debug:
+    msg: "{{ aws_version_output.stdout }}"

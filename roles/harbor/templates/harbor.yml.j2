@@ -1,0 +1,55 @@
+# Configuration file of Harbor
+
+# The IP address or hostname to access admin UI and registry service.
+hostname: {{ vm_ip }}
+
+http:
+  port: 80
+
+https:
+  port: 443
+  certificate: {{ cert_dir }}/{{ vm_ip }}.crt
+  private_key: {{ cert_dir }}/{{ vm_ip }}.key
+
+harbor_admin_password: {{ harbor_admin_password | default('Harbor12345') }}
+
+data_volume: {{ home_dir }}/data
+
+database:
+  password: {{ harbor_db_password | default('root123') }}
+  max_idle_conns: 100
+  max_open_conns: 900
+
+storage:
+  filesystem:
+    rootdirectory: {{ home_dir }}/data/storage
+    maxthreads: 100
+
+jobservice:
+  max_job_workers: {{ harbor_max_job_workers | default(10) }}
+  job_loggers: {{ harbor_job_loggers | default(['file']) }}
+  logger_sweeper_duration: {{ harbor_logger_sweeper_duration | default(14) }}
+
+log:
+  level: info
+  local:
+    rotate_count: 15
+    rotate_size: 200M
+    location: /var/log/jobs
+  job:
+    level: info
+    rotate_count: 50
+    rotate_size: 200M
+    location: /var/log/harbor
+
+notification:
+  webhook_job_max_retry: {{ harbor_webhook_job_max_retry | default(10) }}
+  webhook_job_http_client_timeout: {{ harbor_webhook_job_http_client_timeout | default(5) }}
+
+trivy:
+  enabled: true
+  ignore_unfixed: true
+  skip_update: false
+  offline_scan: false
+  security_check:
+    severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"

@@ -1,0 +1,79 @@
+---
+# roles/certificate/tasks/main.yml
+
+- name: Ensure local certificate directory exists
+  ansible.builtin.file:
+    path: "{{ cert_dir }}"
+    state: directory
+    mode: '0755'
+  tags: certificate
+
+- name: Generate a self-signed certificate with IP SAN using OpenSSL
+  ansible.builtin.shell: |
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN={{ vm_ip }}" \
+      -addext "subjectAltName = IP:{{ vm_ip }}" \
+      -keyout {{ cert_dir }}/{{ vm_ip }}.key \
+      -out {{ cert_dir }}/{{ vm_ip }}.crt
+  args:
+    creates: "{{ cert_dir }}/{{ vm_ip }}.crt"
+  become: yes
+  tags: certificate
+
+- name: Ensure Docker certs directory exists for our VM IP
+  ansible.builtin.file:
+    path: "{{ docker_certs_dir }}"
+    state: directory
+    mode: '0755'
+  become: yes
+  tags: certificate
+
+- name: Copy generated certificate to Docker certs directory
+  ansible.builtin.copy:
+    src: "{{ cert_dir }}/{{ vm_ip }}.crt"
+    dest: "{{ docker_certs_dir }}/ca.crt"
+    mode: '0644'
+    remote_src: yes
+  become: yes
+  tags: certificate
+
+- name: Copy generated key to Docker certs directory (optional)
+  ansible.builtin.copy:
+    src: "{{ cert_dir }}/{{ vm_ip }}.key"
+    dest: "{{ docker_certs_dir }}/{{ vm_ip }}.key"
+    mode: '0600'
+    remote_src: yes
+  become: yes
+  tags: certificate
+
+- name: Copy certificate to system trusted CA directory
+  ansible.builtin.copy:
+    src: "{{ cert_dir }}/{{ vm_ip }}.crt"
+    dest: "/usr/local/share/ca-certificates/{{ vm_ip }}.crt"
+    mode: '0644'
+    remote_src: yes
+  become: yes
+  tags: certificate
+
+- name: Update system CA certificates
+  ansible.builtin.command: update-ca-certificates
+  become: yes
+  tags: certificate
+
+- name: Restart Docker to pick up new certificates
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  become: yes
+  tags: certificate
+
+- name: Display Docker info for verification
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  tags: certificate
+
+- name: Debug Docker info output
+  ansible.builtin.debug:
+    var: docker_info.stdout
+  tags: certificate

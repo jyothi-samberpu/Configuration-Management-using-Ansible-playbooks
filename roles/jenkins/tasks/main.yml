@@ -1,0 +1,151 @@
+---
+- name: Remove apt lock files if they exist
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/apt/lists/lock
+    - /var/cache/apt/archives/lock
+  register: remove_lock_files
+- debug:
+    var: remove_lock_files
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+  register: update_cache
+- debug:
+    var: update_cache
+
+- name: Install dependencies
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - software-properties-common
+    - apt-transport-https
+    - ca-certificates
+  register: install_dependencies
+- debug:
+    var: install_dependencies
+
+- name: Install OpenJDK 17
+  apt:
+    name: openjdk-17-jdk
+    state: present
+  become: true
+  register: install_java
+- debug:
+    var: install_java
+
+- name: Set Java 17 as default
+  alternatives:
+    name: java
+    path: /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+  become: true
+
+- name: Verify Java Version
+  command: java -version
+  register: java_version
+  changed_when: false
+- debug:
+    var: java_version
+
+- name: Download the new Jenkins GPG key (2023)
+  get_url:
+    url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+    dest: /usr/share/keyrings/jenkins-keyring.asc
+    mode: '0644'
+  register: download_jenkins_key
+- debug:
+    var: download_jenkins_key
+
+- name: Add Jenkins repository (using the new key)
+  apt_repository:
+    repo: 'deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/'
+    state: present
+    filename: 'jenkins'
+  register: add_jenkins_repo
+- debug:
+    var: add_jenkins_repo
+
+- name: Update apt cache after adding Jenkins repository
+  apt:
+    update_cache: yes
+  register: update_cache_after_repo
+- debug:
+    var: update_cache_after_repo
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    state: present
+  register: install_jenkins
+- debug:
+    var: install_jenkins
+
+- name: Ensure Jenkins is started and enabled
+  systemd:
+    name: jenkins
+    state: started
+    enabled: yes
+  register: start_jenkins
+- debug:
+    var: start_jenkins
+
+- name: Get initial Jenkins admin password
+  shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_admin_password
+  changed_when: false
+
+- name: Wait for Jenkins to start
+  uri:
+    url: "http://localhost:8080"
+    status_code: 200
+    method: GET
+    user: "admin"
+    password: "{{ jenkins_admin_password.stdout }}"
+    force_basic_auth: yes
+  register: jenkins_response
+  retries: 10
+  delay: 10
+  until: jenkins_response.status == 200
+- debug:
+    var: jenkins_response
+
+- name: Install Jenkins plugins
+  jenkins_plugin:
+    name: "{{ item }}"
+    state: present
+    url_username: "admin"
+    url_password: "{{ jenkins_admin_password.stdout }}"
+  loop:
+    - build-timeout
+    - credentials-binding
+    - timestamper
+    - ws-cleanup
+    - workflow-aggregator
+    - github-branch-source
+    - pipeline-github-lib
+    - pipeline-graph-view
+    - pipeline
+    - git
+    - ssh-slaves
+    - matrix-auth
+    - pam-auth
+    - ldap
+    - dark-theme
+    - ssh
+    - javadoc
+    - pipeline-multibranch-defaults
+    - multibranch-scan-webhook-trigger
+    - multibranch-pipeline-inline-definition
+  register: install_plugins
+- debug:
+    var: install_plugins
+
+- name: Restart Jenkins (if needed)
+  systemd:
+    name: jenkins
+    state: restarted
+  when: install_plugins.changed  # Restart only if plugins were installed/updated
