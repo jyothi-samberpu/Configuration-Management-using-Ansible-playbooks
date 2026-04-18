@@ -1,76 +1,78 @@
-# sysmgmt-playbooks
-A collection of Ansible playbooks for system management and configuration, designed to automate various administrative tasks across different environments.
-markdown
+# Configuration Management Using Ansible Playbooks
 
-# System Management Playbooks
+Repository owner: **jyothi-samberpu**
 
-Welcome to the **System Management Playbooks** repository! This collection is designed to streamline and automate various system administration tasks across multiple Linux servers, enhancing efficiency and reducing manual effort for Sysadmins.
+GitHub repository: https://github.com/jyothi-samberpu/Configuration-Management-using-Ansible-playbooks
 
 ## Overview
 
-This repository contains Ansible playbooks tailored for:
+This repository provides Ansible automation for infrastructure setup and maintenance tasks, including:
 
-- **Configuration Management**: Standardizing configurations across servers to ensure consistency.
-- **Software Deployment**: Automating the installation, updates, and management of software packages.
-- **User Management**: Handling user accounts, permissions, and access rights.
-- **Security Enhancements**: Implementing security best practices, including firewall rules, SSH configurations, and more.
-- **Monitoring Setup**: Configuring monitoring tools to keep track of system health and performance.
-- **Backup Solutions**: Automating backup processes to protect data integrity.
-- **System Maintenance**: Routine tasks like log rotation, disk cleanup, and system updates.
+- Configuration management across Linux servers
+- Kubernetes prerequisite setup
+- Harbor and Vault related automation
+- AWS CLI installation and CI/CD helper playbooks
+- GitHub Runner and Jenkins support tasks
+- System upgrade and cleanup operations
 
-## Getting Started
+## Repository Structure
 
-### Prerequisites
+- `inventory/`: inventory file and shared variables
+- `playbooks/`: top-level playbooks for common operations
+- `roles/`: reusable Ansible roles
+- `Scripts/`: deployment, compose templates, and pipeline helpers
 
-- **Ansible**: Ensure you have Ansible installed on your control machine. You can install it via:
-  ```bash
-  sudo apt-get install ansible  # For Debian/Ubuntu
-  sudo yum install ansible       # For CentOS/RHEL
-  sudo dnf install ansible       # For Fedora
+## Prerequisites
 
+- Ansible installed on the control node
+- SSH access to target hosts
+- Python available on managed hosts (as required by Ansible)
 
-    SSH Access: You need SSH access to the target Linux servers with key-based authentication preferred for security.
+Install Ansible (examples):
 
+```bash
+sudo apt-get install -y ansible
+sudo yum install -y ansible
+sudo dnf install -y ansible
+```
 
-Usage
+## Quick Start
 
-    Clone the Repository:
-    bash
+1. Clone the repository:
 
-    git clone https://github.com/raphaelmulenda/sysmgmt-playbooks.git
-    cd sysmgmt-playbooks
+```bash
+git clone https://github.com/jyothi-samberpu/Configuration-Management-using-Ansible-playbooks.git
+cd Configuration-Management-using-Ansible-playbooks
+```
 
-    Inventory File: Create or edit the hosts file in the repository to list your servers:
-    ini
+2. Update inventory in `inventory/hosts`.
 
-    [webservers]
-    server1 ansible_host=192.168.1.10
-    server2 ansible_host=192.168.1.11
+Example:
 
-    [dbservers]
-    db1 ansible_host=192.168.1.20
+```ini
+[webservers]
+server1 ansible_host=192.168.1.10
+server2 ansible_host=192.168.1.11
 
-    Run Playbooks: Execute playbooks using Ansible. For example, to run a playbook for updating all systems:
-    bash
+[dbservers]
+db1 ansible_host=192.168.1.20
+```
 
-    ansible-playbook -i hosts playbooks/update_systems.yml
+3. Run a playbook:
 
-    Correct the path in your command to:
+```bash
+ansible-playbook -i inventory/hosts playbooks/remove_ceph.yml
+```
 
-    ansible-playbook -i inventory/hosts -vvv playbooks/remove_ceph.yml
-    
-    ansible-playbook -i inventory/hosts playbooks/
+## Common Playbooks
 
-Playbooks
-Here's a brief overview of some of the playbooks available:
+- `playbooks/system_upgrade.yml`: system package upgrade tasks
+- `playbooks/ssh_key_setup.yml`: SSH key and access setup
+- `playbooks/github_runner.yaml`: GitHub Runner installation/configuration
+- `playbooks/install_aws_cli.yaml`: AWS CLI installation
+- `playbooks/linux_setup_harbor.yml`: Harbor-related setup tasks
 
-    update_systems.yml: Updates all packages on the target servers.
-    configure_ssh.yml: Secures SSH configuration across servers.
-    setup_users.yml: Manages user accounts, adding or removing users as needed.
-    install_monitoring.yml: Installs and configures monitoring tools like Nagios or Prometheus.
-    backup_config.yml: Sets up automated backups for critical data.
+## Notes
 
-
-
-
-
+- Keep environment-specific values in inventory/group vars.
+- Test changes in a non-production environment first.
